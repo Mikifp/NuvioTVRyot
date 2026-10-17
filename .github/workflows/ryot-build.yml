@@ -1,0 +1,112 @@
+name: Build NuvioTV with Ryot
+
+# Builds a sideloadable Android TV APK of this fork. It installs next to the official
+# Nuvio app (package com.nuviodebug.com) and appears as a separate app on the TV.
+#
+# Optional, but recommended so new builds install over old ones without losing settings:
+#   repository secret RYOT_KEYSTORE_BASE64   base64 of a keystore (.jks)
+#   repository secret RYOT_KEYSTORE_PASSWORD store and key password
+#   (alias "nuvio-ryot"; see RYOT.md for the one-line keytool command)
+
+on:
+  push:
+    branches: [ryot-integration]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ryot-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Test and build APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Prepare local properties
+        env:
+          LOCAL_PROPERTIES_BASE64: ${{ secrets.LOCAL_PROPERTIES_BASE64 }}
+        run: |
+          if [ -n "$LOCAL_PROPERTIES_BASE64" ]; then
+            printf '%s' "$LOCAL_PROPERTIES_BASE64" | base64 --decode > local.properties
+          else
+            touch local.properties
+          fi
+          touch local.dev.properties
+
+      - name: Prepare signing key
+        env:
+          RYOT_KEYSTORE_BASE64: ${{ secrets.RYOT_KEYSTORE_BASE64 }}
+          RYOT_KEYSTORE_PASSWORD: ${{ secrets.RYOT_KEYSTORE_PASSWORD }}
+        run: |
+          KEYSTORE="$RUNNER_TEMP/signing.jks"
+          if [ -n "$RYOT_KEYSTORE_BASE64" ] && [ -n "$RYOT_KEYSTORE_PASSWORD" ]; then
+            printf '%s' "$RYOT_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+            PASSWORD="$RYOT_KEYSTORE_PASSWORD"
+            echo "Signing with the keystore from repository secrets." >> "$GITHUB_STEP_SUMMARY"
+          else
+            PASSWORD="android"
+            keytool -genkeypair -keystore "$KEYSTORE" -storepass "$PASSWORD" -alias nuvio-ryot \
+              -keypass "$PASSWORD" -dname "CN=Nuvio Ryot build" -keyalg RSA -keysize 2048 -validity 10000
+            {
+              echo "### ⚠️ Signed with a one-off key"
+              echo "This APK won't install over a previous build; uninstall the old one first."
+              echo "Add the RYOT_KEYSTORE_BASE64 and RYOT_KEYSTORE_PASSWORD secrets (see RYOT.md) to fix that."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "::add-mask::$PASSWORD"
+          {
+            echo "NUVIO_RELEASE_STORE_FILE=$KEYSTORE"
+            echo "NUVIO_RELEASE_KEY_ALIAS=nuvio-ryot"
+            echo "NUVIO_RELEASE_KEY_PASSWORD=$PASSWORD"
+            echo "NUVIO_RELEASE_STORE_PASSWORD=$PASSWORD"
+          } >> "$GITHUB_ENV"
+
+      - name: Run Ryot and tracking unit tests
+        run: >
+          ./gradlew :app:testFullDebugUnitTest
+          --tests 'com.nuvio.tv.data.ryot.*'
+          --tests 'com.nuvio.tv.core.tracking.*'
+          --tests 'com.nuvio.tv.ui.screens.settings.TrackingSettingsViewModelTest'
+          --tests 'com.nuvio.tv.data.repository.LibraryRepositoryTrackingTest'
+          --stacktrace
+
+      - name: Build APK
+        run: ./gradlew :app:assembleFullDebug --stacktrace
+
+      - name: Rename APK
+        run: |
+          SHORT_SHA="$(git rev-parse --short HEAD)"
+          cp app/build/outputs/apk/full/debug/app-full-universal-debug.apk "NuvioTV-Ryot-$SHORT_SHA.apk"
+          echo "APK_NAME=NuvioTV-Ryot-$SHORT_SHA.apk" >> "$GITHUB_ENV"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APK_NAME }}
+          path: ${{ env.APK_NAME }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: app/build/reports/tests/
+          if-no-files-found: ignore
+          retention-days: 7

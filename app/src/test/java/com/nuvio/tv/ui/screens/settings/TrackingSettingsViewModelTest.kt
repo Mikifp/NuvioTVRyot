@@ -10,6 +10,8 @@ import com.nuvio.tv.data.local.TraktAuthState
 import com.nuvio.tv.data.local.TraktSettingsDataStore
 import com.nuvio.tv.data.local.WatchProgressSource
 import com.nuvio.tv.data.mdblist.MdbListTestHarness
+import com.nuvio.tv.data.ryot.RyotAuthState
+import com.nuvio.tv.data.ryot.RyotAuthStore
 import com.nuvio.tv.data.simkl.SimklAnimeIdPreference
 import com.nuvio.tv.data.simkl.SimklAuthRepository
 import com.nuvio.tv.data.simkl.SimklAuthState
@@ -55,7 +57,9 @@ class TrackingSettingsViewModelTest {
         }
         val trakt = mockk<TraktAuthDataStore> { every { state } returns flowOf(TraktAuthState()) }
         val simkl = mockk<SimklAuthRepository> { every { state } returns MutableStateFlow(SimklAuthState()) }
-        val viewModel = TrackingSettingsViewModel(controller, settings, mockk(), trakt, simkl, harness.store, profiles)
+        val ryotState = MutableStateFlow(RyotAuthState(profileId = 1))
+        val ryot = mockk<RyotAuthStore> { every { state } returns ryotState }
+        val viewModel = TrackingSettingsViewModel(controller, settings, mockk(), trakt, simkl, harness.store, profiles, ryot)
         runCurrent()
         assertEquals(setOf(TrackingProviderId.MDBLIST), viewModel.uiState.value.connectedProviderIds)
         val previousCount = reconciliations.size
@@ -64,6 +68,7 @@ class TrackingSettingsViewModelTest {
         assertFalse(viewModel.uiState.value.isReady)
         assertEquals(previousCount, reconciliations.size)
         harness.store.selectProfile(2)
+        ryotState.value = RyotAuthState(profileId = 2)
         runCurrent()
         assertTrue(viewModel.uiState.value.isReady)
         assertEquals(WatchProgressSource.MDBLIST, viewModel.uiState.value.watchProgressSource)

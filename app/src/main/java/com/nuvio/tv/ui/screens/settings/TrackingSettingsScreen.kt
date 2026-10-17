@@ -16,6 +16,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Dns
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -67,6 +69,7 @@ fun TrackingSettingsContent(
     traktViewModel: TraktViewModel = hiltViewModel(),
     simklViewModel: SimklSettingsViewModel = hiltViewModel(),
     mdbListViewModel: MdbListTrackerViewModel = hiltViewModel(),
+    ryotViewModel: RyotSettingsViewModel = hiltViewModel(),
     trackingViewModel: TrackingSettingsViewModel = hiltViewModel(),
     initialFocusRequester: FocusRequester? = null
 ) {
@@ -74,11 +77,13 @@ fun TrackingSettingsContent(
     val simklState by simklViewModel.uiState.collectAsStateWithLifecycle()
     val mdbListState by mdbListViewModel.uiState.collectAsStateWithLifecycle()
     val mdbListLibraryLists by mdbListViewModel.libraryLists.collectAsStateWithLifecycle()
+    val ryotState by ryotViewModel.uiState.collectAsStateWithLifecycle()
     val trackingState by trackingViewModel.uiState.collectAsStateWithLifecycle()
     val ownTraktFocusRequester = remember { FocusRequester() }
     val traktFocusRequester = initialFocusRequester ?: ownTraktFocusRequester
     val simklFocusRequester = remember { FocusRequester() }
     val mdbListFocusRequester = remember { FocusRequester() }
+    val ryotFocusRequester = remember { FocusRequester() }
     val libraryFocusRequester = remember { FocusRequester() }
     val watchProgressFocusRequester = remember { FocusRequester() }
     val continueWatchingFocusRequester = remember { FocusRequester() }
@@ -109,12 +114,14 @@ fun TrackingSettingsContent(
         dismissOnConnected,
         traktState.mode,
         simklState.mode,
-        mdbListState.isConnected
+        mdbListState.isConnected,
+        ryotState.isConnected
     ) {
         val connected = when (dismissOnConnected) {
             TrackingProviderId.TRAKT -> traktState.mode == TraktConnectionMode.CONNECTED
             TrackingProviderId.SIMKL -> simklState.mode == SimklConnectionMode.CONNECTED
             TrackingProviderId.MDBLIST -> mdbListState.isConnected
+            TrackingProviderId.RYOT -> ryotState.isConnected
             null -> false
         }
         if (activeProvider == dismissOnConnected && connected) {
@@ -132,6 +139,7 @@ fun TrackingSettingsContent(
                 TrackingFocusTarget.TRAKT -> traktFocusRequester.requestFocus()
                 TrackingFocusTarget.SIMKL -> simklFocusRequester.requestFocus()
                 TrackingFocusTarget.MDBLIST -> mdbListFocusRequester.requestFocus()
+                TrackingFocusTarget.RYOT -> ryotFocusRequester.requestFocus()
                 TrackingFocusTarget.LIBRARY -> libraryFocusRequester.requestFocus()
                 TrackingFocusTarget.WATCH_PROGRESS -> watchProgressFocusRequester.requestFocus()
                 TrackingFocusTarget.CONTINUE_WATCHING -> continueWatchingFocusRequester.requestFocus()
@@ -146,6 +154,7 @@ fun TrackingSettingsContent(
             TrackingProviderId.TRAKT -> TrackingFocusTarget.TRAKT
             TrackingProviderId.SIMKL -> TrackingFocusTarget.SIMKL
             TrackingProviderId.MDBLIST -> TrackingFocusTarget.MDBLIST
+            TrackingProviderId.RYOT -> TrackingFocusTarget.RYOT
         }
         activeProvider = provider
         disconnectProvider = null
@@ -178,6 +187,10 @@ fun TrackingSettingsContent(
                     dismissOnConnected = provider
                     mdbListViewModel.onConnect()
                 }
+            }
+            TrackingProviderId.RYOT -> {
+                ryotViewModel.clearError()
+                dismissOnConnected = if (ryotState.isConnected) null else provider
             }
         }
     }
@@ -221,7 +234,10 @@ fun TrackingSettingsContent(
         onMdbListLibraryListsClick = {
             mdbListViewModel.onLibraryListsOpened()
             showMdbListLibraryListsDialog = true
-        }
+        },
+        ryotState = ryotState,
+        ryotFocusRequester = ryotFocusRequester,
+        onRyotClick = { openProvider(TrackingProviderId.RYOT) }
     )
 
     when (activeProvider) {
@@ -282,6 +298,24 @@ fun TrackingSettingsContent(
                 }
             )
         }
+        TrackingProviderId.RYOT -> {
+            RyotAccountDialog(
+                state = ryotState,
+                onConnectWithPassword = ryotViewModel::connectWithPassword,
+                onConnectWithToken = ryotViewModel::connectWithToken,
+                onSync = ryotViewModel::onSyncNow,
+                onDisconnect = {
+                    activeProvider = null
+                    dismissOnConnected = null
+                    disconnectProvider = TrackingProviderId.RYOT
+                },
+                onDismiss = {
+                    ryotViewModel.clearError()
+                    activeProvider = null
+                    dismissOnConnected = null
+                }
+            )
+        }
         null -> Unit
     }
 
@@ -296,6 +330,7 @@ fun TrackingSettingsContent(
                     TrackingProviderId.TRAKT -> R.string.trakt_disconnect_title
                     TrackingProviderId.SIMKL -> R.string.simkl_disconnect_title
                     TrackingProviderId.MDBLIST -> R.string.mdblist_disconnect_title
+                    TrackingProviderId.RYOT -> R.string.ryot_disconnect_title
                 }
             ),
             subtitle = stringResource(
@@ -303,6 +338,7 @@ fun TrackingSettingsContent(
                     TrackingProviderId.TRAKT -> R.string.trakt_disconnect_subtitle
                     TrackingProviderId.SIMKL -> R.string.simkl_disconnect_subtitle
                     TrackingProviderId.MDBLIST -> R.string.mdblist_disconnect_subtitle
+                    TrackingProviderId.RYOT -> R.string.ryot_disconnect_subtitle
                 }
             ),
             width = 520.dp,
@@ -324,6 +360,7 @@ fun TrackingSettingsContent(
                             TrackingProviderId.TRAKT -> traktViewModel.onDisconnectClick()
                             TrackingProviderId.SIMKL -> simklViewModel.onDisconnect()
                             TrackingProviderId.MDBLIST -> mdbListViewModel.onDisconnect()
+                            TrackingProviderId.RYOT -> ryotViewModel.onDisconnect()
                         }
                     },
                     primary = true
@@ -491,12 +528,16 @@ internal fun TrackingSettingsOverview(
     onMoreLikeThisClick: () -> Unit,
     onAnimeIdClick: () -> Unit,
     mdbListLibraryLists: MdbListLibraryListsUiState = MdbListLibraryListsUiState(),
-    onMdbListLibraryListsClick: () -> Unit = {}
+    onMdbListLibraryListsClick: () -> Unit = {},
+    ryotState: RyotSettingsUiState = RyotSettingsUiState(),
+    ryotFocusRequester: FocusRequester = remember { FocusRequester() },
+    onRyotClick: () -> Unit = {}
 ) {
     val listState = rememberLazyListState()
     val traktPresentation = traktConnectionPresentation(traktState)
     val simklPresentation = simklConnectionPresentation(simklState)
     val mdbListPresentation = mdbListConnectionPresentation(mdbListState)
+    val ryotPresentation = ryotConnectionPresentation(ryotState)
     val traktConnected = traktState.mode == TraktConnectionMode.CONNECTED
     val traktProgressActive = trackingState.watchProgressSource == WatchProgressSource.TRAKT
 
@@ -557,6 +598,17 @@ internal fun TrackingSettingsOverview(
                             modifier = Modifier
                                 .focusRequester(mdbListFocusRequester)
                                 .testTag(TrackingSettingsTestTags.MDBLIST_PROVIDER)
+                        )
+                        SettingsActionRow(
+                            title = stringResource(R.string.ryot_name),
+                            subtitle = ryotPresentation.subtitle,
+                            value = ryotPresentation.value,
+                            valueColor = ryotPresentation.color,
+                            leadingIcon = Icons.Filled.Dns,
+                            onClick = onRyotClick,
+                            modifier = Modifier
+                                .focusRequester(ryotFocusRequester)
+                                .testTag(TrackingSettingsTestTags.RYOT_PROVIDER)
                         )
                     }
                 }
@@ -672,7 +724,7 @@ internal fun TrackingSettingsOverview(
     }
 }
 
-private data class TrackingConnectionPresentation(
+internal data class TrackingConnectionPresentation(
     val subtitle: String,
     val value: String,
     val color: Color
@@ -761,6 +813,7 @@ private fun watchProgressSourceLabel(source: WatchProgressSource): String = when
     WatchProgressSource.TRAKT -> stringResource(R.string.trakt_name)
     WatchProgressSource.SIMKL -> stringResource(R.string.simkl_name)
     WatchProgressSource.MDBLIST -> stringResource(R.string.mdblist_name)
+    WatchProgressSource.RYOT -> stringResource(R.string.ryot_name)
     WatchProgressSource.NUVIO_SYNC -> stringResource(R.string.trakt_watch_progress_source_nuvio)
 }
 
@@ -769,6 +822,7 @@ private fun librarySourceLabel(mode: LibrarySourceMode): String = when (mode) {
     LibrarySourceMode.TRAKT -> stringResource(R.string.trakt_name)
     LibrarySourceMode.SIMKL -> stringResource(R.string.simkl_name)
     LibrarySourceMode.MDBLIST -> stringResource(R.string.mdblist_name)
+    LibrarySourceMode.RYOT -> stringResource(R.string.ryot_name)
     LibrarySourceMode.LOCAL -> stringResource(R.string.trakt_library_source_nuvio)
 }
 
@@ -800,6 +854,7 @@ private enum class TrackingFocusTarget {
     TRAKT,
     SIMKL,
     MDBLIST,
+    RYOT,
     LIBRARY,
     WATCH_PROGRESS,
     CONTINUE_WATCHING,
@@ -811,6 +866,7 @@ internal object TrackingSettingsTestTags {
     const val TRAKT_PROVIDER = "tracking_provider_trakt"
     const val SIMKL_PROVIDER = "tracking_provider_simkl"
     const val MDBLIST_PROVIDER = "tracking_provider_mdblist"
+    const val RYOT_PROVIDER = "tracking_provider_ryot"
     const val MDBLIST_LIBRARY_LISTS = "tracking_mdblist_library_lists"
     const val LIBRARY_SOURCE = "tracking_source_library"
     const val WATCH_PROGRESS_SOURCE = "tracking_source_watch_progress"

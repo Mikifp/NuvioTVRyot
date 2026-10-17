@@ -16,6 +16,7 @@ import com.nuvio.tv.data.simkl.SimklAnimeIdPreference
 import com.nuvio.tv.data.simkl.SimklAuthRepository
 import com.nuvio.tv.data.simkl.SimklSyncRepository
 import com.nuvio.tv.data.mdblist.MdbListAuthStore
+import com.nuvio.tv.data.ryot.RyotAuthStore
 import com.nuvio.tv.domain.model.LibrarySourceMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -48,18 +49,26 @@ class TrackingSettingsViewModel @Inject constructor(
     traktAuthDataStore: TraktAuthDataStore,
     simklAuthRepository: SimklAuthRepository,
     mdbListAuth: MdbListAuthStore,
-    profiles: ProfileManager
+    profiles: ProfileManager,
+    ryotAuth: RyotAuthStore
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(TrackingSettingsUiState())
     val uiState: StateFlow<TrackingSettingsUiState> = _uiState.asStateFlow()
 
     init {
         viewModelScope.launch {
-            val connected = combine(traktAuthDataStore.state, simklAuthRepository.state, mdbListAuth.state, profiles.activeProfileId) { trakt, simkl, mdblist, profileId ->
-                if (mdblist.scope.profileId != profileId) null else buildSet<TrackingProviderId> {
+            val connected = combine(
+                traktAuthDataStore.state,
+                simklAuthRepository.state,
+                mdbListAuth.state,
+                ryotAuth.state,
+                profiles.activeProfileId
+            ) { trakt, simkl, mdblist, ryot, profileId ->
+                if (mdblist.scope.profileId != profileId || ryot.profileId != profileId) null else buildSet<TrackingProviderId> {
                     if (trakt.isAuthenticated) add(TrackingProviderId.TRAKT)
                     if (simkl.isAuthenticated) add(TrackingProviderId.SIMKL)
                     if (mdblist.isAuthenticated) add(TrackingProviderId.MDBLIST)
+                    if (ryot.isAuthenticated) add(TrackingProviderId.RYOT)
                 }
             }
             combine(

@@ -60,7 +60,8 @@ enum class LibrarySourceMode {
     LOCAL,
     TRAKT,
     SIMKL,
-    MDBLIST
+    MDBLIST,
+    RYOT
 }
 
 enum class LibraryListPrivacy(val apiValue: String) {

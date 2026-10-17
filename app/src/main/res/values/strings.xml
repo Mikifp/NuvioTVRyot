@@ -1204,6 +1204,30 @@
 
 
     <string name="mdblist_name">MDBList</string>
+    <string name="ryot_name">Ryot</string>
+    <string name="ryot_tracking_description">Your self-hosted Ryot server: progress, history and collections</string>
+    <string name="ryot_connected_as">Connected as %1$s</string>
+    <string name="ryot_connect_title">Connect Ryot</string>
+    <string name="ryot_connect_subtitle">Sign in to your Ryot server. Nuvio keeps a long-lived token for this profile, never your password.</string>
+    <string name="ryot_server_label">Server address</string>
+    <string name="ryot_server_placeholder">ryot.example.com or 192.168.1.10:8000</string>
+    <string name="ryot_username_label">Username</string>
+    <string name="ryot_password_label">Password</string>
+    <string name="ryot_token_label">API token</string>
+    <string name="ryot_token_placeholder">From Ryot: Settings → Integrations → Create API token</string>
+    <string name="ryot_mode_password">Username &amp; password</string>
+    <string name="ryot_mode_token">API token</string>
+    <string name="ryot_connect">Connect</string>
+    <string name="ryot_connecting">Connecting…</string>
+    <string name="ryot_sync_now">Sync now</string>
+    <string name="ryot_syncing">Syncing with Ryot…</string>
+    <string name="ryot_last_synced">Last synced %1$s</string>
+    <string name="ryot_summary">%1$d movies and shows · %2$d collections</string>
+    <string name="ryot_disconnect">Disconnect</string>
+    <string name="ryot_close">Close</string>
+    <string name="ryot_disconnect_title">Disconnect Ryot?</string>
+    <string name="ryot_disconnect_subtitle">Nuvio stops syncing with Ryot on this profile. Nothing is deleted from your Ryot server.</string>
+    <string name="ryot_missing_fields">Enter the server address and your login</string>
     <string name="mdblist_tracking_description">Sync watched history and playback progress across devices</string>
     <string name="mdblist_connected_as">Connected as %1$s</string>
     <string name="mdblist_account_fallback">MDBList user</string>
